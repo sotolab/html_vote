@@ -1,0 +1,308 @@
+<!Doctype html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="http://code.jquery.com/jquery-latest.js "></script>
+
+    <!-- bootsrtap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+
+    <head>
+        <title>vote example</title>
+        <meta charset="UTF-8">
+        <script type="text/javascript" src="./js/coinstack-1.1.19.min.js"></script>
+        <script type="text/javascript">
+
+            let DEBUG = 1;
+
+            if (DEBUG) console.log('starting...');
+
+            let client = new CoinStack('c7dbfacbdf1510889b38c01b8440b1', '10e88e9904f29c98356fd2d12b26de', 'c3sp2.blocko.io', 'https');
+            if (DEBUG) console.log("client: ", client);
+
+            let privateKey = " L4anwZj2k6km2xPbiRtK5aMzxhrx9ATA9SicRsZMwsNuy47F64oB";
+            let fromAddress = "1Av5UvHsgaZaLVvjAV3BbwB7fcgQ3Gaunq";
+
+            client.getBalance(fromAddress, function (err, balance) {
+                if (DEBUG) console.log("fromAddress getBalance: ", CoinStack.Math.toBitcoin(balance) + ' BTC');
+            });
+
+            let source = `
+        local system = require("system")
+
+        -- 투표 생성
+        -- 이름, 메뉴, 투표 참여자 
+        function createVote(name, desp, target) 
+            scoreBoard = createScoreBoard(name, target)
+            system.setItem("vote" .. name, {desp=desp, candidates=target, score=scoreBoard})
+        end
+
+        -- 점수판 생성
+        -- 이름, 메뉴
+        function createScoreBoard(name,target)
+            scoreBoard={};
+
+            for i=1,table.getn(target) do
+            scoreBoard[target[i]]= 0
+            end
+
+            return scoreBoard
+        end
+
+        --투표 조회
+        --이름
+        function getVote(name)
+            return system.getItem("vote" .. name)
+        end
+
+        --투표
+        --이름, 메뉴 번호
+        function doVote(name, pick) 
+            vote = getVote(name)
+            vote.score[pick] = vote.score[pick] +1
+            system.setItem("vote" .. name, vote)
+        end
+
+        function getCandidates(name)
+            return system.getItem("vote" .. name).candidates
+        end
+
+        --function getResult(name)
+            --return system.getItem("vote" .. name).score
+        --end
+		
+		function getResult(name)
+			local result = system.getItem("vote" .. name).score
+			local resultBoard = {}
+			local returnValue = {}
+			local length = 0;
+			for k, v in pairs(result) do
+			    returnValue = {menu=k, score=v};
+				table.insert(resultBoard, returnValue);
+			end
+			return resultBoard
+		end
+`
+            let voteCreate = `call("createVote","sample","점심메뉴?",{"김치찌개","된장찌개","청국장"})`
+
+            function refreshCandidate() {
+                // tablePlace를 초기화하고 계좌수 만큼 테이블의 행을 생성합니다.
+                document.getElementById("tablePlace").innerText = " ";
+                var idiv = document.createElement('div');
+                document.getElementById("tablePlace").appendChild(idiv);
+
+                client.queryContract(fromAddress, "LSC", `res,err = call("getVote","sample") return res`, function (err, res) {
+
+                    if (err != undefined) return;
+                    if (DEBUG) console.log("queryContract");
+                    var data = JSON.stringify(res.result.score);
+                    document.getElementById("description").innerHTML = data;
+                    if (DEBUG) console.log("document");
+
+
+                    if (DEBUG) {
+                        console.log("refreshCandidate: ", res);
+                        console.log("desp: ", res.result.desp);
+                        console.log("candidates: ", res.result.candidates);
+                        console.log("score: ", res.result.score);
+                        console.log("data: ", data);
+                        console.log("data.length: ", data.length);
+                    }
+
+                    var list = res.result.candidates;
+                    var score = data;
+
+                    document.getElementById("description").innerText = res.result.desp;
+
+                    var input = "<table>";
+                    for (var i = 0; i < list.length; i++) {
+                        if (DEBUG) console.log('+list:(' + list[i] + ')');
+                        input += "<tr><td> *" + list[i] + "</td><td></td></tr>";
+                    }
+                    input += "</table><br>";
+                    idiv.innerHTML = input;
+
+                    document.getElementById("resultPlace").innerText = data;
+
+                });
+
+            }
+
+            function getResult() {
+                document.getElementById("resultPlace").innerText = " ";
+                var idiv = document.createElement('div');
+                document.getElementById("resultPlace").appendChild(idiv);
+
+                var result = [];
+                client.queryContract(fromAddress, "LSC", `res,err = call("getResult","sample") return res`, function (err, res) {
+                    if (err != undefined) return;
+
+                    if (DEBUG) {
+                        console.log("+@getResult:", res); //.result.score);
+                        console.log("+@results:", res.result);
+                        console.log("+@length:", res.result.length);
+                        console.log("+@length:", Object.keys(res.result).length);
+
+                    }
+
+                    var list = res.result;
+                    if (DEBUG) console.log("+@list:", list);
+
+                    var input = "<table>";
+                    for (var i = 0; i < list.length; i++) {
+                        if (DEBUG) console.log('+list:(' + list[i].menu + ',' + list[i].score + ')');
+                        input += "<tr><td> *" + list[i].menu + "</td><td> " + list[i].score + " </td></tr>";
+                    }
+                    input += "</table><br>";
+                    idiv.innerHTML = input;
+
+                });
+            }
+
+
+            function getStatusinfo() {
+                var blockNumber = 0;
+
+                client.getBlockchainStatus(function (error, status) {
+                    if (!error) {
+                        document.getElementById('blockinfo').value = status.best_height;
+
+                    }
+                    if (DEBUG) console.log("getStatusinfo: ", status);
+                });
+            }
+
+            function definition() {
+
+                let builder = client.createLuaContractBuilder()
+                builder = builder.setInput(fromAddress).setContractID(fromAddress);
+                builder.setDefinition(source)
+                builder.buildTransaction(function (err, tx) {
+                    try {
+                        tx.sign(privateKey);
+                        let rawTx = tx.serialize();
+                        client.sendTransaction(rawTx, function (err) {
+                            if (!err) {
+                                if (DEBUG) console.log("definition: ", tx.getHash());
+                                alert("정의가 완료되었습니다.\n블록에 트랜잭션이 포함될때까지 기다려주세요.");
+                            }
+                        });
+
+                    } catch (e) {
+                        if (DEBUG) console.log(e)
+                    }
+                })
+
+
+                if (DEBUG) {
+                    console.log('+definition');
+                }
+            }
+
+            function executeSource(source) {
+                let builder = client.createLuaContractBuilder()
+                builder = builder.setInput(fromAddress).setContractID(fromAddress);
+                builder.setExecution(source)
+                builder.buildTransaction(function (err, tx) {
+                    try {
+                        tx.sign(privateKey);
+                        let rawTx = tx.serialize();
+                        client.sendTransaction(rawTx, function (err) {
+                            if (!err) {
+                                if (DEBUG) console.log("executeSource: ", tx.getHash());
+                            }
+                        });
+
+                    } catch (e) {
+                        if (DEBUG) console.log(e)
+                    }
+                })
+            }
+
+            function createVote() {
+                executeSource('call("createVote","sample","점심메뉴?",{"김치찌개","된장찌개","청국장"})');
+                alert("생성이 완료되었습니다.");
+
+                if (DEBUG) {
+                   console.log('+createVote');
+                }
+            }
+
+            function doVote() {
+                var pick = document.getElementById('candidate').value;
+                if (DEBUG) {
+                    if (DEBUG) console.log('+pick : ', pick);
+                }
+                executeSource(`call("doVote", "sample", "` + pick + `")`);
+
+                alert("투표가 완료되었습니다.\n블록에 트랜잭션이 포함되면 조회됩니다.")
+            }
+
+        </script>
+
+    </head>
+
+    <body>
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false"
+                        aria-controls="navbar">
+                    </button>
+                    <a class="navbar-brand" href="#">Blocko</a>
+                </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav">
+                        <li class="active">
+                            <a href="#">BTC Vote</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        <br>
+        <br>
+
+        <div class="container theme-showcase" role="main">
+            <div class='row'>
+                <div class='col'>
+                    <h2>
+                        <strong> Welcome to Web Vote </strong>
+                    </h2>
+                    <!-- <div id="tablePlace"></div> -->
+                    <button type="button" id="definition" onClick="definition();">정의를 하지 않았다면</button>
+                    <button type="button" id="createVote" onClick="createVote();">투표를 생성 하지 않았다면</button>
+                    <div class="panel-body">
+                        <input type="text" id="candidate" />
+                        <button type="button" id="vote" onClick="doVote();">투표</button>
+                        <p> Message </P>
+                        <div id="description"></div>
+
+                        <div id="tablePlace"></div>
+
+                        <div id="resultPlace"></div>
+
+                    </div>
+
+                    <script>
+                        getResult();
+                    </script>
+                </div>
+            </div>
+        </div>
+        <hr>
+    </body>
+    <footer class="py-5 bg-dark">
+        <div class="container">
+            <p class="m-0 text-center text-white">
+                <b>Copyright &copy; Blocko 2019</b>
+            </p>
+        </div>
+    </footer>
+
+    </body>
+
+
+</html>
