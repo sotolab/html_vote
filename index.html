@@ -22,8 +22,8 @@
             let client = new CoinStack('c7dbfacbdf1510889b38c01b8440b1', '10e88e9904f29c98356fd2d12b26de', 'c3sp2.blocko.io', 'https');
             if (DEBUG) console.log("client: ", client);
 
-            let privateKey = " L4anwZj2k6km2xPbiRtK5aMzxhrx9ATA9SicRsZMwsNuy47F64oB";
-            let fromAddress = "1Av5UvHsgaZaLVvjAV3BbwB7fcgQ3Gaunq";
+            let privateKey = "";
+            let fromAddress = "";
 
             client.getBalance(fromAddress, function (err, balance) {
                 if (DEBUG) console.log("fromAddress getBalance: ", CoinStack.Math.toBitcoin(balance) + ' BTC');
